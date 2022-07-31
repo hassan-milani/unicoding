@@ -2,12 +2,13 @@ from ninja import Router
 from ninja.security import django_auth
 from django.shortcuts import get_object_or_404
 from accounting.models import Account, AccountTypeChoices
-from accounting.schemas import AccountOut, FourOFourOut, GeneralLedgerOut
+from accounting.schemas import AccountOut, FourOFourOut, GeneralLedgerOut, SumChildParent
 from typing import List
 from django.db.models import Sum, Avg
 from rest_framework import status
 
 from restauth.authorization import AuthBearer
+
 
 account_router = Router(tags=['account'])
 
@@ -56,6 +57,30 @@ def get_account_balances(request):
 
     return status.HTTP_200_OK, result
 
+
+
+@account_router.get('/parent-child-balances/', response=List[SumChildParent])
+def get_parent_child_balances(request):
+    accounts = Account.objects.all()
+    parentlist = []
+   
+    for account in accounts:
+        if account.account_set.all():
+            sumbalanceUSD = 0
+            sumbalanceIQD = 0
+            for child in account.account_set.all():
+                balance = list(account.balance())
+                balance += list(child.balance())
+                for b in balance:
+                    if b['currency'] == 'USD':
+                        sumbalanceUSD += int(b['sum'])
+                    else:
+                        sumbalanceIQD += int(b['sum'])
+            parentlist.append({'account': account.name, 'balance': list(account.balance()), 'id':account.id, 'sumbalanceUSD':sumbalanceUSD, 'sumbalanceIQD':sumbalanceIQD})
+           
+             
+           
+    return status.HTTP_200_OK, parentlist
 
 
 
